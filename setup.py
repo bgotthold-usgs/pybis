@@ -13,7 +13,7 @@ setup(
     name='pybis',
 
 # PEP - version as three components ("major.minor.micro")
-    version='0.1.0',
+    version='0.1.1',
 
     description='A set of helper code for Biogeographic Information System projects',
     long_description=read('README.rst'),
