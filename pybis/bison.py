@@ -4,11 +4,10 @@ class Bison:
 
 
     def get_bison_search_url(queryType,criteria):
-        from bis import bis
-
-        _baseURL = "https://bison.usgs.gov/api/search.json?count=1&"
+        from pybis.bis import Bis as bis
+        bisonBaseSearchURL_json = "https://bison.usgs.gov/api/search.json?count=1&"
 
         if queryType != "TSN":
-            return _baseURL+"type=scientific_name&species="+bis.stringCleaning(criteria)
+            return bisonBaseSearchURL_json+"type=scientific_name&species="+bis.string_cleaning(criteria)
         else:
-            return _baseURL+"tsn="+str(criteria)
+            return bisonBaseSearchURL_json+"tsn="+str(criteria)

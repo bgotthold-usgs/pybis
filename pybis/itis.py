@@ -45,6 +45,7 @@ class Itis:
 
         return itisData
 
+
     def get_itis_search_url(searchstr, fuzzy=False, validAccepted=True):
         fuzzyLevel = "~0.8"
 
@@ -73,6 +74,7 @@ class Itis:
             itisSearchURL = itisSearchURL + "%20AND%20(usage:accepted%20OR%20usage:valid)"
 
         return itisSearchURL
+
 
     def check_itis_solr(scientificname):
         import requests
