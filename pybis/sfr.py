@@ -190,6 +190,7 @@ class SfrPipeline:
         :return: None
         """
         feature_count = 0
+        print("What: %d" % len(src_layer))
         for feature in src_layer:
             feature_count = feature_count + 1
             if feature_count % 10 == 0:
@@ -233,6 +234,7 @@ class SfrPipeline:
             # Create ogr object from shape file
             ogr_sf = ogr.Open(self.spatial_file)
             shape_file_layer = ogr_sf.GetLayer(0)
+            shape_file_layer_two = ogr_sf.GetLayer(1)
 
             wkb_type = self.get_wkb_type(shape_file_layer)
             if wkb_type == ogr.wkbPolygon:
@@ -258,6 +260,8 @@ class SfrPipeline:
             )
 
             self.copy_features(shape_file_layer, db_layer)
+            if shape_file_layer_two:
+                self.copy_features(shape_file_layer_two, db_layer)
             print("Finished copying features")
         except:
             # Close connections before raising exception
