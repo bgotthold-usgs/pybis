@@ -190,11 +190,11 @@ class SfrPipeline:
         :return: None
         """
         feature_count = 0
-        print("What: %d" % len(src_layer))
+        print("What: %d" % len(src_layer), flush=True)
         for feature in src_layer:
             feature_count = feature_count + 1
-            if feature_count % 10 == 0:
-                print(feature_count)
+            # if feature_count % 10 == 0:
+            print(feature_count, flush=True)
             geom = feature.GetGeometryRef()
 
             if self.flip_coordinates and geom.GetGeometryType() == ogr.wkbPoint:
@@ -262,7 +262,7 @@ class SfrPipeline:
             self.copy_features(shape_file_layer, db_layer)
             if shape_file_layer_two:
                 self.copy_features(shape_file_layer_two, db_layer)
-            print("Finished copying features")
+            print("Finished creating features in memory")
         except:
             # Close connections before raising exception
             if ogr_sf is not None:
@@ -270,6 +270,7 @@ class SfrPipeline:
             if ogr_db is not None:
                 ogr_db.Destroy()
             self.clean_up_files()
+            print("This is the error")
             raise
 
         # Close connections and flush data to postgis
