@@ -54,7 +54,7 @@ class SfrPipeline:
         self.flip_coordinates = flip_coordinates
         self.custom_encoding = custom_encoding
         self.database = os.getenv("DB_DATABASE", "bis")
-        self.postgis_server = os.getenv("POSTGIS_SERVER", "localhost")
+        self.postgis_server = os.getenv("POSTGIS_SERVER", "postgis")
         self.postgis_port = os.getenv("POSTGIS_PORT", "5432")
         self.db_user = os.getenv("DB_USERNAME", "postgres")
         self.db_password = os.getenv("DB_PASSWORD", "admin")
@@ -204,6 +204,7 @@ class SfrPipeline:
                 feature.SetGeometryDirectly(ogr.ForceToMultiPolygon(geom))
 
             dest_layer.CreateFeature(feature)
+        print("Features created: %d" % feature_count)
 
     @staticmethod
     def get_wkb_type(src_layer):
