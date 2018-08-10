@@ -190,11 +190,13 @@ class SfrPipeline:
         :return: None
         """
         feature_count = 0
-        print("What: %d" % len(src_layer), flush=True)
-        for feature in src_layer:
+        src_len = len(src_layer)
+        print("What: %d" % src_len, flush=True)
+        for x in range(src_len):
             feature_count = feature_count + 1
             # if feature_count % 10 == 0:
             print(feature_count, flush=True)
+            feature = src_layer[x]
             geom = feature.GetGeometryRef()
 
             if self.flip_coordinates and geom.GetGeometryType() == ogr.wkbPoint:
