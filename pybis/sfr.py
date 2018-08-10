@@ -54,7 +54,7 @@ class SfrPipeline:
         self.flip_coordinates = flip_coordinates
         self.custom_encoding = custom_encoding
         self.database = os.getenv("DB_DATABASE", "bis")
-        self.postgis_server = os.getenv("POSTGIS_SERVER", "postgis")
+        self.postgis_server = os.getenv("POSTGIS_SERVER", "localhost")
         self.postgis_port = os.getenv("POSTGIS_PORT", "5432")
         self.db_user = os.getenv("DB_USERNAME", "postgres")
         self.db_password = os.getenv("DB_PASSWORD", "admin")
@@ -92,7 +92,7 @@ class SfrPipeline:
         current = 0
         chunk_size = 1024
         printed = []
-        print("Downloading file")
+        print("Downloading file", flush=True)
 
         r = requests.get(url, stream=True)
 
@@ -111,6 +111,7 @@ class SfrPipeline:
         Extract the contents of the zip file
         :return: None
         """
+        print("Extracting zip file", flush=True)
         self.directory = self.zip_file[0:-4]
         zip_file = zipfile.ZipFile(self.zip_file, 'r')
         zip_file.extractall(self.directory)
@@ -191,11 +192,10 @@ class SfrPipeline:
         """
         feature_count = 0
         src_len = len(src_layer)
-        print("What: %d" % src_len, flush=True)
         for x in range(src_len):
             feature_count = feature_count + 1
-            # if feature_count % 10 == 0:
-            print(feature_count, flush=True)
+            if feature_count % 10 == 0:
+                print(feature_count, flush=True)
             feature = src_layer[x]
             geom = feature.GetGeometryRef()
 
@@ -207,7 +207,7 @@ class SfrPipeline:
                 feature.SetGeometryDirectly(ogr.ForceToMultiPolygon(geom))
 
             dest_layer.CreateFeature(feature)
-        print("Features created: %d" % feature_count)
+        print("Features created: %d" % feature_count, flush=True)
 
     @staticmethod
     def get_wkb_type(src_layer):
