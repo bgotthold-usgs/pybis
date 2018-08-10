@@ -10,7 +10,7 @@ If you have git and pip available, bis can be installed with:
 
 `pip install git+https://github.com/usgs-bis/pybis.git`
 
-Note: the db module in this package currently requires users to set the following system variables in order to access the DEV-IS MongoDB components - DB_USERNAME, DB_PASSWORD, MONGODB_SERVER, DB_DATABASE
+Note: the db module in this package currently requires system variables to be set in the running environment in order to connect to cloud-based database infrastructure.
 
 
 -----------

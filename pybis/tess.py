@@ -4,7 +4,7 @@ class Tess:
 
 
     def get_tess_search_url(queryType,criteria):
-        from pybis import bis
+        from pybis.bis import Bis as bis
 
         if queryType != "TSN":
             criteria = '"'+bis.stringCleaning(criteria)+'"'
@@ -16,7 +16,7 @@ class Tess:
         import requests
         import xmltodict
         from datetime import datetime
-        from bis import bis
+        from pybis.bis import Bis as bis
 
         # These properties in TESS data often contain single quotes or other characters that need to be escaped in order for the resulting data to be inserted into databases like PostgreSQL
         keysToClean = ["COMNAME","INVNAME"]

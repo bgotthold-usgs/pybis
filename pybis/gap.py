@@ -5,7 +5,7 @@ class Gap:
 
     def gap_to_tir(sbItem):
         from datetime import datetime
-        from bis import bis
+        from pybis.bis import Bis as bis
 
         _gapTaxonomicGroups = {}
         _gapTaxonomicGroups["m"] = "mammals"
@@ -22,7 +22,7 @@ class Gap:
             if tag["scheme"] == "https://www.sciencebase.gov/vocab/bis/tir/scientificname":
                 sbItem["scientificname"] = tag["name"]
             elif tag["scheme"] == "https://www.sciencebase.gov/vocab/bis/tir/commonname":
-                sbItem["commonname"] = bis.stringCleaning(tag["name"])
+                sbItem["commonname"] = bis.string_cleaning(tag["name"])
         sbItem.pop("tags")
 
         for identifier in sbItem["identifiers"]:
@@ -33,10 +33,11 @@ class Gap:
 
         return sbItem
 
+
     # This function is similar to the first one we created for bundling GAP species information from ScienceBase but it flattens the structure to make things simpler for downstream use.
     def gap_to_tir_flat(sbItem) -> object:
         from datetime import datetime
-        from bis import bis
+        from pybis.bis import Bis as bis
 
         _gapTaxonomicGroups = {}
         _gapTaxonomicGroups["m"] = "mammals"
@@ -56,7 +57,7 @@ class Gap:
             if tag["scheme"] == "https://www.sciencebase.gov/vocab/bis/tir/scientificname":
                 newItem["scientificname"] = tag["name"]
             elif tag["scheme"] == "https://www.sciencebase.gov/vocab/bis/tir/commonname":
-                newItem["commonname"] = bis.stringCleaning(tag["name"])
+                newItem["commonname"] = bis.string_cleaning(tag["name"])
 
         for identifier in sbItem["identifiers"]:
             newItem[identifier["type"]] = identifier["key"]
