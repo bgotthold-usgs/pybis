@@ -102,7 +102,7 @@ class SfrPipeline:
                 percent = math.floor(current / size * 100)
                 if percent not in printed and percent % 10 == 0:
                     printed.append(percent)
-                    print("Current: %d%%" % percent)
+                    print("Current: %d%%" % percent, flush=True)
                 if chunk:
                     f.write(chunk)
 
