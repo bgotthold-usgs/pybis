@@ -25,22 +25,23 @@ API_TOKEN
 
 
 class SfrPipeline:
-    def __init__(self, item_id, table, srid, schema="sfr", overwrite_existing_table="No", flip_coordinates=False,
-                 custom_encoding=None, file_type=None, batch_size=5, make_valid=False):
+    def __init__(self, item_id, table, srid, zipfile_title, schema="sfr", overwrite_existing_table="No",
+                 flip_coordinates=False, custom_encoding=None, spatial_file_type=None, batch_size=5, make_valid=False):
         """
         :param item_id: ScienceBase item ID of item with zipfile containing either a shape or geojson file --required
         :param schema: Name of the schema to add the new table to (must already exist, for now use sfr)
         :param table: Name of table to create -- required
         :param srid: The SRID of the geospatial data -- required
+        :param zipfile_title: title of the target zipfile in the ScienceBase item -- required
         :param overwrite_existing_table: Overwrite table if it already exists. "Yes" or "No"
         :param flip_coordinates: Some of the files with point geometry need to have their lat/lng's swapped
         :param custom_encoding: A significant number of the shape files in SB have needed a "LATIN1" encoding
-        :param file_type: ".geojson" or ".shp" -- If nothing is specified, it will grab whatever one is there
+        :param spatial_file_type: ".geojson" or ".shp" -- If nothing is specified, it will grab whatever one is there
         :param batch_size: Number of geometries to be indexed at a time. 5 is safe, can be increases for point geoms
         :param make_valid: Run ST_MakeValid on the geoms before sending the geojson to ElasticSearch
         """
-        if item_id is None or table is None or srid is None:
-            raise Exception("Missing one of the required params: item_id, table, or srid")
+        if item_id is None or table is None or srid is None or zipfile_title is None:
+            raise Exception("Missing one of the required params: item_id, table, srid, or zipfile_title")
 
         self.description = "Set of functions for adding data to the SFR"
         self.item_id = item_id
@@ -49,7 +50,6 @@ class SfrPipeline:
         self.srid = srid
         self.zip_file = None
         self.directory = None
-        self.spatial_file = None
         self.overwrite_existing_table = overwrite_existing_table
         self.flip_coordinates = flip_coordinates
         self.custom_encoding = custom_encoding
@@ -58,14 +58,15 @@ class SfrPipeline:
         self.postgis_port = os.getenv("POSTGIS_PORT", "5432")
         self.db_user = os.getenv("DB_USERNAME", "postgres")
         self.db_password = os.getenv("DB_PASSWORD", "admin")
-        self.file_type = file_type
+        self.spatial_file_type = spatial_file_type
         self.pg2elastic = os.getenv("PG_TO_ELASTIC", "http://localhost:8090")
         self.api_token = os.getenv("API_TOKEN", "token1234")
         self.batch_size = batch_size
         self.make_valid = make_valid
+        self.zipfile_title = zipfile_title
+        self.spatial_file_list = []
 
-    @staticmethod
-    def get_first_zip_file(item):
+    def get_zip_file(self, item):
         """
         Grab the first zip file from the item. This can be improved moving forward
         :param item: JSON of ScienceBase item
@@ -73,14 +74,14 @@ class SfrPipeline:
         """
         try:
             for file in item["files"]:
-                if file["contentType"] == "application/zip":
+                if file["contentType"] == "application/zip" and file["title"] == self.zipfile_title:
                     return file
         except:
             print("Error getting zip file from ScienceBase item: %s" % (item["id"]))
             raise
 
         # If it gets here, no zipfile was found
-        raise Exception("No zip file found in ScienceBase item")
+        raise Exception("No zip file found in ScienceBase item with title: %s" % self.zipfile_title)
 
     def download_file(self, url, size=1):
         """
@@ -124,7 +125,7 @@ class SfrPipeline:
         """
         sb = pysb.SbSession()
         item = sb.get_item(self.item_id)
-        zip_file = self.get_first_zip_file(item)
+        zip_file = self.get_zip_file(item)
         download_uri = zip_file["downloadUri"]
         file_size = zip_file["size"]
 
@@ -142,8 +143,7 @@ class SfrPipeline:
         """
         for file in os.listdir(self.directory):
             if file.endswith(".shp"):
-                self.spatial_file = os.path.join(self.directory, file)
-                return
+                self.spatial_file_list.append(os.path.join(self.directory, file))
 
     def set_spatial_file_geojson(self):
         """
@@ -152,19 +152,17 @@ class SfrPipeline:
         """
         for file in os.listdir(self.directory):
             if file.endswith(".geojson"):
-                self.spatial_file = os.path.join(self.directory, file)
-                return
+                self.spatial_file_list.append(os.path.join(self.directory, file))
 
-    def set_spatial_file_type(self, file_type):
+    def set_spatial_file_type(self, spatial_file_type):
         """
         Set the spatial file with the name of the first specified file type in the extracted directory
-        :param file_type: File type -- ".geojson" or ".shp" for example
+        :param spatial_file_type: File type -- ".geojson" or ".shp" for example
         :return: None
         """
         for file in os.listdir(self.directory):
-            if file.endswith(file_type):
-                self.spatial_file = os.path.join(self.directory, file)
-                return
+            if file.endswith(spatial_file_type):
+                self.spatial_file_list.append(os.path.join(self.directory, file))
 
     def create_layer_from_definition(self, ogr_db, layer_definition, geom_type):
         """
@@ -183,19 +181,19 @@ class SfrPipeline:
             db_layer.CreateField(layer_definition.GetFieldDefn(i))
         return db_layer
 
-    def copy_features(self, src_layer, dest_layer):
+    def copy_features(self, src_layer, dest_layer, start_count):
         """
         Iterate through each feature, converting polygons to multipolygons if needed then add them to the postgis table
         :param src_layer: Source of spatial data
         :param dest_layer: Table to add geom to
         :return: None
         """
-        feature_count = 0
         src_len = len(src_layer)
+        total = start_count
         for x in range(src_len):
-            feature_count = feature_count + 1
-            if feature_count % 10 == 0:
-                print(feature_count, flush=True)
+            total = total + 1
+            if total % 100 == 0:
+                print(total, flush=True)
             feature = src_layer[x]
             geom = feature.GetGeometryRef()
 
@@ -205,9 +203,9 @@ class SfrPipeline:
                 geom.SetPoint_2D(0, y, x)
             elif geom.GetGeometryType() == ogr.wkbPolygon:
                 feature.SetGeometryDirectly(ogr.ForceToMultiPolygon(geom))
-
+            feature.SetFID(total)
             dest_layer.CreateFeature(feature)
-        print("Features created: %d" % feature_count, flush=True)
+        return total
 
     @staticmethod
     def get_wkb_type(src_layer):
@@ -233,17 +231,6 @@ class SfrPipeline:
         ogr_db = None
 
         try:
-            # Create ogr object from shape file
-            ogr_sf = ogr.Open(self.spatial_file)
-            shape_file_layer = ogr_sf.GetLayer(0)
-            shape_file_layer_two = ogr_sf.GetLayer(1)
-
-            wkb_type = self.get_wkb_type(shape_file_layer)
-            if wkb_type == ogr.wkbPolygon:
-                wkb_type = ogr.wkbMultiPolygon
-
-            layer_definition = shape_file_layer.GetLayerDefn()
-
             connection_string = "dbname='%s' host='%s' port='%s' user='%s' password='%s'" % (
                 self.database,
                 self.postgis_server,
@@ -254,17 +241,29 @@ class SfrPipeline:
 
             # Create ogr object for postgis
             ogr_db = ogr.Open("PG:" + connection_string)
+            first_layer = True
+            db_layer = None
+            block = 0
+            for spatial_file in self.spatial_file_list:
+                # Create ogr object from shape file
+                ogr_sf = ogr.Open(spatial_file)
+                shape_file_layer = ogr_sf.GetLayer(0)
 
-            db_layer = self.create_layer_from_definition(
-                ogr_db,
-                layer_definition,
-                wkb_type
-            )
+                if first_layer:
+                    first_layer = False
+                    layer_definition = shape_file_layer.GetLayerDefn()
+                    wkb_type = self.get_wkb_type(shape_file_layer)
+                    if wkb_type == ogr.wkbPolygon:
+                        wkb_type = ogr.wkbMultiPolygon
+                    db_layer = self.create_layer_from_definition(
+                        ogr_db,
+                        layer_definition,
+                        wkb_type
+                    )
 
-            self.copy_features(shape_file_layer, db_layer)
-            if shape_file_layer_two:
-                self.copy_features(shape_file_layer_two, db_layer)
-            print("Finished creating features in memory")
+                block = self.copy_features(shape_file_layer, db_layer, block)
+                ogr_db.SyncToDisk()
+                ogr_sf.Destroy()
         except:
             # Close connections before raising exception
             if ogr_sf is not None:
@@ -275,10 +274,8 @@ class SfrPipeline:
             print("This is the error")
             raise
 
-        # Close connections and flush data to postgis
-        ogr_db.SyncToDisk()
+        # Close connection
         ogr_db.Destroy()
-        ogr_sf.Destroy()
 
     def clean_up_files(self):
         """
@@ -293,11 +290,11 @@ class SfrPipeline:
         Set spatial file type using helper function
         :return: None
         """
-        if self.file_type:
-            self.set_spatial_file_type(self.file_type)
+        if self.spatial_file_type:
+            self.set_spatial_file_type(self.spatial_file_type)
         else:
             self.set_spatial_file_type(".geojson")
-            if self.spatial_file is None:
+            if not self.spatial_file_list:
                 self.set_spatial_file_type(".shp")
 
     def add_index_job_to_queue(self):
@@ -325,7 +322,7 @@ class SfrPipeline:
         self.get_zip_file_and_extract()
         self.check_and_set_spatial_file_type()
 
-        if self.spatial_file is None:
+        if not self.spatial_file_list:
             self.clean_up_files()
             raise Exception("No spatial file found in extracted zip")
 
@@ -340,3 +337,16 @@ class SfrPipeline:
         self.spatial_file_to_postgis()
         self.add_index_job_to_queue()
 
+
+# This is an example working usage:
+
+# obj = sfr.SfrPipeline(item_id="5b7611bee4b0f5d5787feb66",
+#                   table="my_test_sfr_table",
+#                   srid=5070,
+#                   zipfile_title="Source Data",
+#                   overwrite_existing_table="No",
+#                   flip_coordinates=False,
+#                   custom_encoding=None,
+#                   spatial_file_type=".geojson")
+#
+# obj.spatial_file_to_postgis()
