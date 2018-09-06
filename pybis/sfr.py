@@ -420,7 +420,13 @@ class SfrPipeline:
             if not self.spatial_file_list:
                 self.set_spatial_file_type(".shp")
 
-    def add_index_job_to_queue(self, batch_size=5, make_valid=False, reverse_orientation=False, primary_key=None):
+    def add_index_job_to_queue(self,
+                               schema,
+                               table,
+                               batch_size=5,
+                               make_valid=False,
+                               reverse_orientation=False,
+                               primary_key=None):
         """
         Ping pg2elastic microservice to index postgis table
         :return: JSON of response from microservice
@@ -428,8 +434,8 @@ class SfrPipeline:
         pg2elastic = self.pg2elastic + "/elastic/reindex"
         pg2elastic += "?database=%s" % self.database
         pg2elastic += "&token=%s" % self.api_token
-        pg2elastic += "&schema=%s" % self.schema
-        pg2elastic += "&table=%s" % self.table
+        pg2elastic += "&schema=%s" % schema
+        pg2elastic += "&table=%s" % table
         pg2elastic += "&docSize=%d" % batch_size
 
         if make_valid:
