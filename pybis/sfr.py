@@ -36,8 +36,6 @@ class SfrPipeline:
         'flip_coordinates':False,
         'custom_encoding':None,
         'spatial_file_type':None,
-        'batch_size':5,
-        'make_valid':False,
         'fit_to_bounding_box':False,
         'rounding_precision':None,
         'clean_up_geom':False,
@@ -422,7 +420,7 @@ class SfrPipeline:
             if not self.spatial_file_list:
                 self.set_spatial_file_type(".shp")
 
-    def add_index_job_to_queue(self):
+    def add_index_job_to_queue(self, batch_size=5, make_valid=False, reverse_orientation=False, primary_key=None):
         """
         Ping pg2elastic microservice to index postgis table
         :return: JSON of response from microservice
@@ -432,10 +430,16 @@ class SfrPipeline:
         pg2elastic += "&token=%s" % self.api_token
         pg2elastic += "&schema=%s" % self.schema
         pg2elastic += "&table=%s" % self.table
-        pg2elastic += "&docSize=%s" % self.batch_size
+        pg2elastic += "&docSize=%d" % batch_size
 
-        if self.make_valid:
+        if make_valid:
             pg2elastic += "&makeValid=true"
+
+        if reverse_orientation:
+            pg2elastic += "&reverseOrientation=true"
+
+        if primary_key:
+            pg2elastic += "&primaryKey=%s" % primary_key
 
         return requests.request(method='get', url=pg2elastic).json()
 
