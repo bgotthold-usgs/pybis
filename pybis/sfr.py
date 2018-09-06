@@ -25,9 +25,26 @@ API_TOKEN
 
 
 class SfrPipeline:
-    def __init__(self, item_id, table, srid, zipfile_title, schema="sfr", overwrite_existing_table="No",
-                 flip_coordinates=False, custom_encoding=None, spatial_file_type=None, batch_size=5, make_valid=False,
-                 fit_to_bounding_box=False, rounding_precision=None, clean_up_geom=False):
+
+    default_params = {
+        'item_id':None,
+        'table':None,
+        'srid':None,
+        'zipfile_title':None,
+        'schema':"sfr",
+        'overwrite_existing_table':"No",
+        'flip_coordinates':False,
+        'custom_encoding':None,
+        'spatial_file_type':None,
+        'batch_size':5,
+        'make_valid':False,
+        'fit_to_bounding_box':False,
+        'rounding_precision':None,
+        'clean_up_geom':False,
+        'spatial_file_list': []
+    }
+
+    def __init__(self, *initial_data, **kwargs):
         """
         :param item_id: ScienceBase item ID of item with zipfile containing either a shape or geojson file --required
         :param schema: Name of the schema to add the new table to (must already exist, for now use sfr)
@@ -40,37 +57,29 @@ class SfrPipeline:
         :param spatial_file_type: ".geojson" or ".shp" -- If nothing is specified, it will grab whatever one is there
         :param batch_size: Number of geometries to be indexed at a time. 5 is safe, can be increases for point geoms
         :param make_valid: Run ST_MakeValid on the geoms before sending the geojson to ElasticSearch
+        :param fit_to_bounding_box: This is for lat/lng geoms whose lat's fall outside the +-90.0
+        :param rounding_precision: Round geom points to this level of precision when fixing
+        :param clean_up_geom: Send the geoms through the rigorous cleanup process
         """
-        if item_id is None or table is None or srid is None or zipfile_title is None:
+        self.description = "Set of functions for adding data to the SFR"
+        for key in self.default_params:
+            setattr(self, key, self.default_params[key])
+        for dictionary in initial_data:
+            for key in dictionary:
+                setattr(self, key, dictionary[key])
+        for key in kwargs:
+            setattr(self, key, kwargs[key])
+        if self.item_id is None or self.table is None or self.srid is None or self.zipfile_title is None:
             raise Exception("Missing one of the required params: item_id, table, srid, or zipfile_title")
 
-        self.description = "Set of functions for adding data to the SFR"
-        self.item_id = item_id
-        self.schema = schema
-        self.table = table
-        self.srid = srid
-        self.zip_file = None
-        self.directory = None
-        self.overwrite_existing_table = overwrite_existing_table
-        self.flip_coordinates = flip_coordinates
-        self.custom_encoding = custom_encoding
+        self.pg2elastic = os.getenv("PG_TO_ELASTIC", "http://localhost:8090")
+        self.api_token = os.getenv("API_TOKEN", "token1234")
 
         self.database = os.getenv("DB_DATABASE", "bis")
         self.postgis_server = os.getenv("POSTGIS_SERVER", "localhost")
         self.postgis_port = os.getenv("POSTGIS_PORT", "5432")
         self.db_user = os.getenv("DB_USERNAME", "postgres")
         self.db_password = os.getenv("DB_PASSWORD", "admin")
-
-        self.spatial_file_type = spatial_file_type
-        self.pg2elastic = os.getenv("PG_TO_ELASTIC", "http://localhost:8090")
-        self.api_token = os.getenv("API_TOKEN", "token1234")
-        self.batch_size = batch_size
-        self.make_valid = make_valid
-        self.zipfile_title = zipfile_title
-        self.spatial_file_list = []
-        self.fit_to_bounding_box = fit_to_bounding_box
-        self.rounding_precision = rounding_precision
-        self.clean_up_geom = clean_up_geom
 
     def get_zip_file(self, item):
         """
@@ -184,9 +193,12 @@ class SfrPipeline:
                                       geom_type,
                                       ['OVERWRITE=' + self.overwrite_existing_table])
         for i in range(layer_definition.GetFieldCount()):
-            print(layer_definition.GetFieldDefn(i).GetName())
             if "Src_Date" != layer_definition.GetFieldDefn(i).GetName():
+                if layer_definition.GetFieldDefn(i).GetType() == ogr.OFTReal:
+                    layer_definition.GetFieldDefn(i).SetPrecision(6)
                 db_layer.CreateField(layer_definition.GetFieldDefn(i))
+            else:
+                print("Got source date")
         return db_layer
 
     @staticmethod
@@ -203,7 +215,7 @@ class SfrPipeline:
                 rings[i].AddPoint(point[0], point[1])
         for ring in rings:
             if ring.Area() < .0001:
-                print("Too small!")
+                print("Area too small!")
             else:
                 poly.AddGeometry(ring)
 
@@ -229,17 +241,12 @@ class SfrPipeline:
         return geom
 
     def fix_geometry(self, geom, num):
-        if geom.GetGeometryType() == ogr.wkbPolygon:
-            geom = ogr.ForceToMultiPolygon(geom)
         num_polies = geom.GetGeometryCount()
         multipolygon = ogr.Geometry(ogr.wkbMultiPolygon)
         for n in range(num_polies):
             geo = geom.GetGeometryRef(n)
             num_rings = geo.GetGeometryCount()
             poly = ogr.Geometry(ogr.wkbPolygon)
-            poly = poly.Buffer(0)
-            poly = poly.SimplifyPreserveTopology(0)
-            poly.CloseRings()
             for r_idx in range(num_rings):
                 ring = geo.GetGeometryRef(r_idx)
 
@@ -287,25 +294,32 @@ class SfrPipeline:
             feature = src_layer[x]
             out_layer_defn = dest_layer.GetLayerDefn()
             geom = feature.GetGeometryRef()
-
             out_feature = ogr.Feature(out_layer_defn)
 
-            for i in range(0, out_layer_defn.GetFieldCount()):
+            for i in range(out_layer_defn.GetFieldCount()):
                 field_defn = out_layer_defn.GetFieldDefn(i)
                 field_name = field_defn.GetName()
-                out_feature.SetField(out_layer_defn.GetFieldDefn(i).GetNameRef(), feature.GetField(field_name))
+                field_type = field_defn.GetType()
+                field = feature.GetField(field_name)
+
+                if field_type == ogr.OFTReal:
+                    field = round(field, 6)
+
+                out_feature.SetField(out_layer_defn.GetFieldDefn(i).GetNameRef(), field)
 
             if self.flip_coordinates and geom.GetGeometryType() == ogr.wkbPoint:
                 x = geom.GetX(0)
                 y = geom.GetY(0)
                 geom.SetPoint_2D(0, y, x)
             else:
+                geom = geom.SimplifyPreserveTopology(0)
                 geom.FlattenTo2D()
+                if geom.GetGeometryType() == ogr.wkbPolygon:
+                    geom = ogr.ForceToMultiPolygon(geom)
                 if self.clean_up_geom:
                     geom = self.fix_geometry(geom, total)
                 if self.fit_to_bounding_box:
                     geom = self.fit_geom_to_bounding_box(geom)
-
             out_feature.SetGeometryDirectly(geom)
             out_feature.SetFID(total)
             dest_layer.CreateFeature(out_feature)
@@ -357,6 +371,8 @@ class SfrPipeline:
                 # Create ogr object from shape file
                 ogr_sf = ogr.Open(spatial_file)
                 shape_file_layer = ogr_sf.GetLayer(0)
+
+                print("CRS:", shape_file_layer.GetSpatialRef())
 
                 if first_layer:
                     first_layer = False
@@ -445,30 +461,3 @@ class SfrPipeline:
         """
         self.spatial_file_to_postgis()
         self.add_index_job_to_queue()
-
-
-# This is an example working usage:
-
-# obj = SfrPipeline(item_id="5aabd9a5e4b081f61aaf009b",
-#                   table="published_obis_boundaries",
-#                   srid=4326,
-#                   zipfile_title="load file",
-#                   overwrite_existing_table="YES",
-#                   flip_coordinates=False,
-#                   custom_encoding=None,
-#                   spatial_file_type=".geojson",
-#                   fit_to_bounding_box=True)
-
-
-# obj = SfrPipeline(item_id="5b7c1ef2e4b0f5d5788601be",
-#                   table="published_padus1_4_new",
-#                   srid=5070,
-#                   zipfile_title="padus mat view",
-#                   overwrite_existing_table="YES",
-#                   flip_coordinates=False,
-#                   custom_encoding="LATIN1",
-#                   spatial_file_type=".geojson",
-#                   rounding_precision=5,
-#                   clean_up_geom=True)
-
-# obj.spatial_file_to_postgis()
