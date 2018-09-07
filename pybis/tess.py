@@ -16,7 +16,6 @@ class Tess:
         import requests
         import xmltodict
         from datetime import datetime
-        from pybis.bis import Bis as bis
 
         # These properties in TESS data often contain single quotes or other characters that need to be escaped in order for the resulting data to be inserted into databases like PostgreSQL
         keysToClean = ["COMNAME","INVNAME"]
@@ -44,11 +43,11 @@ class Tess:
             tessData["VIPCODE"] = tessDict["results"]["SPECIES_DETAIL"][0]["VIPCODE"]
             tessData["DPS"] = tessDict["results"]["SPECIES_DETAIL"][0]["DPS"]
             tessData["COUNTRY"] = tessDict["results"]["SPECIES_DETAIL"][0]["COUNTRY"]
-            tessData["INVNAME"] = bis.stringCleaning(tessDict["results"]["SPECIES_DETAIL"][0]["INVNAME"])
+            tessData["INVNAME"] = tessDict["results"]["SPECIES_DETAIL"][0]["INVNAME"]
             tessData["SCINAME"] = tessDict["results"]["SPECIES_DETAIL"][0]["SCINAME"]
-            tessData["COMNAME"] = bis.stringCleaning(tessDict["results"]["SPECIES_DETAIL"][0]["COMNAME"])
+            tessData["COMNAME"] = tessDict["results"]["SPECIES_DETAIL"][0]["COMNAME"]
             try:
-                tessData["REFUGE_OCCURRENCE"] = bis.stringCleaning(tessDict["results"]["SPECIES_DETAIL"][0]["REFUGE_OCCURRENCE"])
+                tessData["REFUGE_OCCURRENCE"] = tessDict["results"]["SPECIES_DETAIL"][0]["REFUGE_OCCURRENCE"]
             except:
                 pass
             tessData["FAMILY"] = tessDict["results"]["SPECIES_DETAIL"][0]["FAMILY"]
@@ -64,9 +63,9 @@ class Tess:
                     thisStatus["LISTING_DATE"] = speciesDetail["LISTING_DATE"]
                 # There are cases where population description information is missing from TESS records
                 if "POP_DESC" in speciesDetail:
-                    thisStatus["POP_DESC"] = bis.stringCleaning(speciesDetail["POP_DESC"])
+                    thisStatus["POP_DESC"] = speciesDetail["POP_DESC"]
                 if "POP_ABBREV" in speciesDetail:
-                    thisStatus["POP_ABBREV"] = bis.stringCleaning(speciesDetail["POP_ABBREV"])
+                    thisStatus["POP_ABBREV"] = speciesDetail["POP_ABBREV"]
                 tessData["listingStatus"].append(thisStatus)
 
         # Handle cases where there is only a single listing status for a species by cleaning/popping a few keys and appending the rest of the result dict
@@ -75,7 +74,7 @@ class Tess:
 
             # Clean up the problematic string properties
             for key in keysToClean:
-                tessData[key] = bis.stringCleaning(tessDict["results"]["SPECIES_DETAIL"][key])
+                tessData[key] = tessDict["results"]["SPECIES_DETAIL"][key]
                 tessDict["results"]["SPECIES_DETAIL"].pop(key,None)
 
             # Build the single listing status record for this species
@@ -87,9 +86,9 @@ class Tess:
                 thisStatus["LISTING_DATE"] = tessDict["results"]["SPECIES_DETAIL"]["LISTING_DATE"]
             # There are cases where population description information is missing from TESS records
             if "POP_DESC" in tessDict["results"]["SPECIES_DETAIL"]:
-                thisStatus["POP_DESC"] = bis.stringCleaning(tessDict["results"]["SPECIES_DETAIL"]["POP_DESC"])
+                thisStatus["POP_DESC"] = tessDict["results"]["SPECIES_DETAIL"]["POP_DESC"]
             if "POP_ABBREV" in tessDict["results"]["SPECIES_DETAIL"]:
-                thisStatus["POP_ABBREV"] = bis.stringCleaning(tessDict["results"]["SPECIES_DETAIL"]["POP_ABBREV"])
+                thisStatus["POP_ABBREV"] = tessDict["results"]["SPECIES_DETAIL"]["POP_ABBREV"]
             tessData["listingStatus"].append(thisStatus)
 
             # Get rid of listing status information from the original dict
