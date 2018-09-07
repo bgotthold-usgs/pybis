@@ -7,7 +7,7 @@ class Tess:
         from pybis.bis import Bis as bis
 
         if queryType != "TSN":
-            criteria = '"'+bis.stringCleaning(criteria)+'"'
+            criteria = '"'+bis.string_cleaning(criteria)+'"'
 
         return "https://ecos.fws.gov/ecp0/TessQuery?request=query&xquery=/SPECIES_DETAIL["+queryType+"="+criteria+"]"
 
