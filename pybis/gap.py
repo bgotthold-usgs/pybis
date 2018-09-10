@@ -2,66 +2,44 @@ class Gap:
     def __init__(self):
         self.description = "Set of functions for working with GAP species and other GAP data"
 
-
     def gap_to_tir(sbItem):
         from datetime import datetime
-        from pybis.bis import Bis as bis
+        import requests
 
-        _gapTaxonomicGroups = {}
-        _gapTaxonomicGroups["m"] = "mammals"
-        _gapTaxonomicGroups["b"] = "birds"
-        _gapTaxonomicGroups["a"] = "amphibians"
-        _gapTaxonomicGroups["r"] = "reptiles"
+        speciesItem = dict()
+        speciesItem['Source'] = 'GAP Species'
+        speciesItem['Cache Date'] = datetime.utcnow().isoformat()
 
-        sbItem["source"] = "GAP Species"
-        sbItem["registrationDate"] = datetime.utcnow().isoformat()
-        sbItem["followTaxonomy"] = False
-        sbItem["taxonomicLookupProperty"] = "tsn"
+        itemIdentifierTypes = [identifier['type'] for identifier in sbItem['identifiers']]
 
-        for tag in sbItem["tags"]:
-            if tag["scheme"] == "https://www.sciencebase.gov/vocab/bis/tir/scientificname":
-                sbItem["scientificname"] = tag["name"]
-            elif tag["scheme"] == "https://www.sciencebase.gov/vocab/bis/tir/commonname":
-                sbItem["commonname"] = bis.string_cleaning(tag["name"])
-        sbItem.pop("tags")
+        for identifier in sbItem['identifiers']:
+            speciesItem[identifier['type']] = identifier['key']
 
-        for identifier in sbItem["identifiers"]:
-            if identifier["type"] == "GAP_SpeciesCode":
-                sbItem["taxonomicgroup"] = _gapTaxonomicGroups[identifier["key"][:1]]
-            elif identifier["type"] == "ITIS_TSN":
-                sbItem["tsn"] = identifier["key"]
+        # Temporary usage of the ScienceBase Vocab to put an appropriate qualifier on ITIS information
+        sbVocab = requests.get(
+            'https://www.sciencebase.gov/vocab/categories?parentId=59e62074e4b0adbd11e26b12&format=json').json()
+        itisIdentifiersFromVocab = [id for id in sbVocab['list'] if id['name'][:4] == 'itis']
+        itisIdentifiers = {}
+        for i in itisIdentifiersFromVocab:
+            itisIdentifiers[i['name']] = i['description']
+        itisIdentifierSet = set(itisIdentifiers.keys())
+        thisItisIdentifier = next((element for element in itemIdentifierTypes if element in itisIdentifierSet), None)
 
-        return sbItem
+        if thisItisIdentifier is not None:
+            from pybis.itis import Itis as itis
+            from pybis.tess import Tess as tess
 
+            itisTSN = speciesItem[thisItisIdentifier]
+            itisResponse = requests.get(itis.get_itis_search_url(itisTSN)).json()
+            speciesItem['ITIS'] = itis.package_itis_json(itisResponse['response']['docs'][0])
+            speciesItem['ITIS']['ITIS TSN Usage Qualifier'] = thisItisIdentifier
+            speciesItem['ITIS']['ITIS TSN Usage Qualifier Description'] = itisIdentifiers[thisItisIdentifier]
 
-    # This function is similar to the first one we created for bundling GAP species information from ScienceBase but it flattens the structure to make things simpler for downstream use.
-    def gap_to_tir_flat(sbItem) -> object:
-        from datetime import datetime
-        from pybis.bis import Bis as bis
+            speciesItem['TESS'] = tess.tess_query(tess.get_tess_search_url('TSN', itisTSN))
 
-        _gapTaxonomicGroups = {}
-        _gapTaxonomicGroups["m"] = "mammals"
-        _gapTaxonomicGroups["b"] = "birds"
-        _gapTaxonomicGroups["a"] = "amphibians"
-        _gapTaxonomicGroups["r"] = "reptiles"
+        modelReportFileURL = next(
+            (f['url'] for f in sbItem['files'] if f['title'] == 'Machine Readable Habitat Database Parameters'), None)
+        if modelReportFileURL is not None:
+            speciesItem['GAP Model Report'] = requests.get(modelReportFileURL).json()
 
-        newItem = {}
-        newItem["sbdoc"] = sbItem
-
-        newItem["source"] = "GAP Species"
-        newItem["registrationDate"] = datetime.utcnow().isoformat()
-        newItem["followTaxonomy"] = False
-        newItem["taxonomicLookupProperty"] = "tsn"
-
-        for tag in sbItem["tags"]:
-            if tag["scheme"] == "https://www.sciencebase.gov/vocab/bis/tir/scientificname":
-                newItem["scientificname"] = tag["name"]
-            elif tag["scheme"] == "https://www.sciencebase.gov/vocab/bis/tir/commonname":
-                newItem["commonname"] = bis.string_cleaning(tag["name"])
-
-        for identifier in sbItem["identifiers"]:
-            newItem[identifier["type"]] = identifier["key"]
-            if identifier["type"] == "GAP_SpeciesCode":
-                newItem["taxonomicgroup"] = _gapTaxonomicGroups[identifier["key"][:1]]
-
-        return newItem
+        return speciesItem
