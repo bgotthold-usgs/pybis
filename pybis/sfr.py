@@ -310,14 +310,15 @@ class SfrPipeline:
                 y = geom.GetY(0)
                 geom.SetPoint_2D(0, y, x)
             else:
-                geom = geom.SimplifyPreserveTopology(0)
-                geom.FlattenTo2D()
-                if geom.GetGeometryType() == ogr.wkbPolygon:
-                    geom = ogr.ForceToMultiPolygon(geom)
-                if self.clean_up_geom:
-                    geom = self.fix_geometry(geom, total)
-                if self.fit_to_bounding_box:
-                    geom = self.fit_geom_to_bounding_box(geom)
+                if geom:
+                    geom = geom.SimplifyPreserveTopology(0)
+                    geom.FlattenTo2D()
+                    if geom.GetGeometryType() == ogr.wkbPolygon:
+                        geom = ogr.ForceToMultiPolygon(geom)
+                    if self.clean_up_geom:
+                        geom = self.fix_geometry(geom, total)
+                    if self.fit_to_bounding_box:
+                        geom = self.fit_geom_to_bounding_box(geom)
             out_feature.SetGeometryDirectly(geom)
             out_feature.SetFID(total)
             dest_layer.CreateFeature(out_feature)
@@ -330,8 +331,11 @@ class SfrPipeline:
         :param src_layer: Source spatial file
         :return: Geometry type
         """
-        first_obj = src_layer.GetFeature(0)
-        return first_obj.GetGeometryRef().GetGeometryType()
+        first_obj = src_layer.GetFeature(0).GetGeometryRef()
+        if first_obj:
+            return first_obj.GetGeometryType()
+        else:
+            return ogr.wkbMultiPolygon
 
     def create_table_from_spatial_file(self):
         """
