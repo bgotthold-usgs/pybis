@@ -2,7 +2,7 @@ import requests
 import math
 import zipfile
 import os
-import pysb
+import sciencebasepy as pysb
 from osgeo import ogr, osr
 import shutil
 
