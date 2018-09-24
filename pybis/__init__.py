@@ -29,7 +29,9 @@ from . import gap
 from . import itis
 from . import iucn
 from . import natureserve
+from . import nhd
 from . import rrl
+from . import sfr
 from . import sgcn
 from . import tess
 from . import worms
