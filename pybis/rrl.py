@@ -51,24 +51,31 @@ class ResearchReferenceLibrary:
     
     
     def lookup_crossref(citation,threshold=60):
+        """
+        Pass a citation or fragments of a citation.  If crossref score > 60 then accept entry as correct citation.
+        :param citation: user defined citation or fragments of a citation, this does not need to be in a specific format
+        :param threshold: default 60 based on some of Sky's initial exploration, as more extensive testing occurs we may want to adjust this default value
+        :return: JSON block of crossref metadata
+        """
+        
         import requests
         from datetime import datetime
-        
-        crossRefDoc = {"Success":False,"Date Checked":datetime.utcnow().isoformat()}
-        
-        crossRefWorksAPI = "https://api.crossref.org/works"
-        mailTo = "bcb@usgs.gov"
-        
-        crossRefQuery = crossRefWorksAPI+"?mailto="+mailTo+"&query.bibliographic="+citation
-        crossRefDoc["Query URL"] = crossRefQuery
-        crossRefResults = requests.get(crossRefQuery).json()
-        
-        if crossRefResults["status"] != "failed" and "items" in crossRefResults["message"].keys() and len(crossRefResults["message"]["items"]) > 0 and crossRefResults["message"]["items"][0]["score"] >= threshold:
-            crossRefDoc["Success"] = True
-            crossRefDoc["Score"] = crossRefResults["message"]["items"][0]["score"]
-            crossRefDoc["Record"] = crossRefResults["message"]["items"][0]
 
-        return crossRefDoc
+        cross_ref_doc = {"Success":False,"Date Checked":datetime.utcnow().isoformat()}
+
+        cross_ref_work_api = "https://api.crossref.org/works"
+        mail_to = "bcb@usgs.gov"
+
+        cross_ref_query = cross_ref_work_api+"?mailto="+mail_to+"&query.bibliographic="+citation
+        cross_ref_doc["Query URL"] = cross_ref_query
+        cross_ref_results = requests.get(cross_ref_query).json()
+
+        if cross_ref_results["status"] != "failed" and "items" in cross_ref_results["message"].keys() and len(cross_ref_results["message"]["items"]) > 0 and cross_ref_results["message"]["items"][0]["score"] >= threshold:
+            cross_ref_doc["Success"] = True
+            cross_ref_doc["Score"] = cross_ref_results["message"]["items"][0]["score"]
+            cross_ref_doc["Record"] = cross_ref_results["message"]["items"][0]
+
+        return cross_ref_doc
     
    
     def lookup_scopus_by_doi(doi):
