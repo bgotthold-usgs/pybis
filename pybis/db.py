@@ -1,7 +1,7 @@
 class Db:
 
-import os
-from pymongo import MongoClient
+    import os
+    from pymongo import MongoClient
 
 """Tools to connect to BIS databases.
 
