@@ -1,7 +1,5 @@
 class Db:
     
-    import os
-    from pymongo import MongoClient
     
     """Tools to connect to BIS databases.
 
@@ -20,6 +18,9 @@ class Db:
         self.description = "Set of functions for connecting to database infrastructure in various environments"
 
     def connect_mongodb(db_name):
+        import os
+        from pymongo import MongoClient
+                
         mongo_uri = "mongodb://" + os.environ["DB_USERNAME"] + ":" + os.environ["DB_PASSWORD"] + "@" + os.environ["MONGODB_SERVER"] + "/" + os.environ["DB_DATABASE"]
         client = MongoClient(mongo_uri)
         client_db = client.get_database(os.environ["DB_DATABASE"])
