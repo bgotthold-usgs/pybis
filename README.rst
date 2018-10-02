@@ -10,7 +10,8 @@ If you have git and pip available, bis can be installed with:
 
 `pip install git+https://github.com/usgs-bis/pybis.git`
 
-Note: the db module in this package currently requires system variables to be set in the running environment in order to connect to cloud-based database infrastructure.
+* The db module in this package currently requires system variables to be set in the running environment in order to connect to cloud-based database infrastructure.
+* Current instances of this package were built using a Conda Python 3.6 environment in order to elegantly handle the GDAL installation. The requirements.txt was built from this virtual environment.
 
 
 -----------

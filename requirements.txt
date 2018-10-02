@@ -8,4 +8,4 @@ urllib3==1.23
 wcwidth==0.1.7
 xmltodict==0.11.0
 gdal==2.2.2
--e git+https://code.chs.usgs.gov/sciencebase/pysb.git#egg=pysb
+sciencebasepy==1.6.2
