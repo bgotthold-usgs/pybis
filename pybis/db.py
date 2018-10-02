@@ -1,21 +1,21 @@
 class Db:
-
+    
     import os
     from pymongo import MongoClient
+    
+    """Tools to connect to BIS databases.
 
-"""Tools to connect to BIS databases.
+    This class contains tools to connect to BIS databases.
 
-This class contains tools to connect to BIS databases.
+    These OS environment variables must be set if they are something other than
+    the defaults:
 
-These OS environment variables must be set if they are something other than
-the defaults:
-
-DB_DATABASE
-DB_USERNAME
-MONGODB_SERVER
-DB_PASSWORD
-"""
-
+    DB_DATABASE
+    DB_USERNAME
+    MONGODB_SERVER
+    DB_PASSWORD
+    """
+    
     def __init__(self):
         self.description = "Set of functions for connecting to database infrastructure in various environments"
 
