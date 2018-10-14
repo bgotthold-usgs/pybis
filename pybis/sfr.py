@@ -5,6 +5,8 @@ import os
 import pysb
 from osgeo import ogr, osr
 import shutil
+import json
+import psycopg2
 
 """SFR pipeline tools.
 
@@ -27,19 +29,28 @@ API_TOKEN
 class SfrPipeline:
 
     default_params = {
-        'item_id':None,
-        'table':None,
-        'srid':None,
-        'zipfile_title':None,
-        'schema':"sfr",
-        'overwrite_existing_table':"No",
-        'flip_coordinates':False,
-        'custom_encoding':None,
-        'spatial_file_type':None,
-        'fit_to_bounding_box':False,
-        'rounding_precision':None,
-        'clean_up_geom':False,
-        'spatial_file_list': []
+        'item_id': None,
+        'table': None,
+        'srid': None,
+        'zipfile_title': None,
+        'schema': 'sfr',
+        'overwrite_existing_table': 'No',
+        'flip_coordinates': False,
+        'custom_encoding': None,
+        'spatial_file_type': None,
+        'fit_to_bounding_box': False,
+        'rounding_precision': None,
+        'clean_up_geom': False,
+        'spatial_file_list': [],
+        'json_schema': None
+    }
+
+    table_definition = {
+        'feature_id': ogr.OFTString,
+        'feature_name': ogr.OFTString,
+        'feature_description': ogr.OFTString,
+        'feature_class': ogr.OFTString,
+        'feature_geometry': None
     }
 
     def __init__(self, *initial_data, **kwargs):
@@ -69,6 +80,10 @@ class SfrPipeline:
             setattr(self, key, kwargs[key])
         if self.item_id is None or self.table is None or self.srid is None or self.zipfile_title is None:
             raise Exception("Missing one of the required params: item_id, table, srid, or zipfile_title")
+
+        self.static_fields = {}
+        self.dynamic_fields = {}
+        self.wkb_type = None
 
         self.pg2elastic = os.getenv("PG_TO_ELASTIC", "http://localhost:8090")
         self.api_token = os.getenv("API_TOKEN", "token1234")
@@ -149,25 +164,19 @@ class SfrPipeline:
         else:
             raise Exception("No URI was found for zipfile download")
 
-    def set_spatial_file_shape_file(self):
-        """
-        Set the spatial file with the name of the first shape file in the extracted directory
-        :return: None
-        """
-        for file in os.listdir(self.directory):
-            if file.endswith(".shp"):
-                self.spatial_file_list.append(os.path.join(self.directory, file))
+    def parse_json_schema(self):
+        for k in self.json_schema["@context"]:
+            if k[0] != "@":
+                field_path = self.json_schema["@context"][k].split("/")
 
-    def set_spatial_file_geojson(self):
-        """
-        Set the spatial file with the name of the first geojson file in the extracted directory
-        :return: None
-        """
-        for file in os.listdir(self.directory):
-            if file.endswith(".geojson"):
-                self.spatial_file_list.append(os.path.join(self.directory, file))
+                field = field_path[len(field_path) - 1]
+                if k[0] == "#":
+                    k_path = k.split("/")
+                    self.dynamic_fields[field] = k_path[len(k_path) - 1]
+                else:
+                    self.static_fields[field] = k
 
-    def set_spatial_file_type(self, spatial_file_type):
+    def set_spatial_files(self, spatial_file_type):
         """
         Set the spatial file with the name of the first specified file type in the extracted directory
         :param spatial_file_type: File type -- ".geojson" or ".shp" for example
@@ -176,6 +185,22 @@ class SfrPipeline:
         for file in os.listdir(self.directory):
             if file.endswith(spatial_file_type):
                 self.spatial_file_list.append(os.path.join(self.directory, file))
+            elif file.lower().endswith("schema.json"):
+                with open(os.path.join(self.directory, file)) as json_file:
+                    self.json_schema = json.load(json_file)
+                self.parse_json_schema()
+
+    def create_layer_from_table_definition(self, ogr_db):
+        srs = osr.SpatialReference()
+        srs.ImportFromEPSG(self.srid)
+        db_layer = ogr_db.CreateLayer(self.schema + '.' + self.table, srs,
+                                      self.table_definition['feature_geometry'],
+                                      ['OVERWRITE=' + self.overwrite_existing_table])
+        for k in self.table_definition:
+            if k != 'feature_geometry':
+                db_layer.CreateField(ogr.FieldDefn(k, self.table_definition[k]))
+
+        return db_layer
 
     def create_layer_from_definition(self, ogr_db, layer_definition, geom_type):
         """
@@ -190,6 +215,10 @@ class SfrPipeline:
         db_layer = ogr_db.CreateLayer(self.schema + '.' + self.table, srs,
                                       geom_type,
                                       ['OVERWRITE=' + self.overwrite_existing_table])
+
+        # There is an odd check in here for Src_Date that we'll want to address soon. There was a problem
+        # in the original padus dataset we worked with that had invalid values in the Src_Date fields, so the
+        # easiest thing to do at the time was to ignore that field.
         for i in range(layer_definition.GetFieldCount()):
             if "Src_Date" != layer_definition.GetFieldDefn(i).GetName():
                 if layer_definition.GetFieldDefn(i).GetType() == ogr.OFTReal:
@@ -198,27 +227,6 @@ class SfrPipeline:
             else:
                 print("Got source date")
         return db_layer
-
-    @staticmethod
-    def poly_from_line(geom):
-        num_geoms = geom.GetGeometryCount()
-        poly = ogr.Geometry(ogr.wkbPolygon)
-        rings = [None] * num_geoms
-        for i in range(num_geoms):
-            rings[i] = ogr.Geometry(ogr.wkbLinearRing)
-            linestring = geom.GetGeometryRef(i)
-            num_points = linestring.GetPointCount()
-            for idx in range(num_points):
-                point = linestring.GetPoint(idx)
-                rings[i].AddPoint(point[0], point[1])
-        for ring in rings:
-            if ring.Area() < .0001:
-                print("Area too small!")
-            else:
-                poly.AddGeometry(ring)
-
-        poly.CloseRings()
-        return poly
 
     @staticmethod
     def fit_geom_to_bounding_box(geom):
@@ -293,7 +301,6 @@ class SfrPipeline:
             out_layer_defn = dest_layer.GetLayerDefn()
             geom = feature.GetGeometryRef()
             out_feature = ogr.Feature(out_layer_defn)
-
             for i in range(out_layer_defn.GetFieldCount()):
                 field_defn = out_layer_defn.GetFieldDefn(i)
                 field_name = field_defn.GetName()
@@ -305,6 +312,8 @@ class SfrPipeline:
 
                 out_feature.SetField(out_layer_defn.GetFieldDefn(i).GetNameRef(), field)
 
+            # This check is in there mainly for a dataset we dealt with early on (the drd_dams dataset I think).
+            # The lat/lngs were out of order in those points
             if self.flip_coordinates and geom.GetGeometryType() == ogr.wkbPoint:
                 x = geom.GetX(0)
                 y = geom.GetY(0)
@@ -324,18 +333,50 @@ class SfrPipeline:
             dest_layer.CreateFeature(out_feature)
         return total
 
-    @staticmethod
-    def get_wkb_type(src_layer):
+    def copy_features_to_sfr(self, src_layer, dest_layer, start_count):
         """
-        Get geometry type of spatial data
-        :param src_layer: Source spatial file
-        :return: Geometry type
+        Iterate through each feature, converting polygons to multipolygons if needed then add them to the postgis table
+        :param src_layer: Source of spatial data
+        :param dest_layer: Table to add geom to
+        :return: None
         """
-        first_obj = src_layer.GetFeature(0).GetGeometryRef()
-        if first_obj:
-            return first_obj.GetGeometryType()
-        else:
-            return ogr.wkbMultiPolygon
+        src_len = len(src_layer)
+        total = start_count
+        for x in range(src_len):
+            total = total + 1
+            if total % 100 == 0:
+                print(total, flush=True)
+            feature = src_layer[x]
+            out_layer_defn = dest_layer.GetLayerDefn()
+            geom = feature.GetGeometryRef()
+            out_feature = ogr.Feature(out_layer_defn)
+
+            source_id = feature.GetField(self.dynamic_fields['feature_id_sourceIdentifier'])
+            out_feature.SetField('feature_id', self.static_fields['feature_id_nameSpaceId'] + ":" + source_id)
+            out_feature.SetField('feature_class', self.static_fields['feature_class'])
+            out_feature.SetField('feature_name', feature.GetField(self.dynamic_fields['feature_name']))
+            out_feature.SetField('feature_description', feature.GetField(self.dynamic_fields['feature_description']))
+
+            # This check is in there mainly for a dataset we dealt with early on (the drd_dams dataset I think).
+            # The lat/lngs were out of order in those points
+            if self.flip_coordinates and geom.GetGeometryType() == ogr.wkbPoint:
+                x = geom.GetX(0)
+                y = geom.GetY(0)
+                geom.SetPoint_2D(0, y, x)
+            else:
+                if geom:
+                    geom = geom.SimplifyPreserveTopology(0)
+                    geom.FlattenTo2D()
+                    if geom.GetGeometryType() == ogr.wkbPolygon:
+                        geom = ogr.ForceToMultiPolygon(geom)
+                    if self.clean_up_geom:
+                        geom = self.fix_geometry(geom, total)
+                    if self.fit_to_bounding_box:
+                        geom = self.fit_geom_to_bounding_box(geom)
+            out_feature.SetGeometryDirectly(geom)
+            out_feature.SetFID(total)
+            dest_layer.CreateFeature(out_feature)
+        return total
 
     def create_table_from_spatial_file(self):
         """
@@ -374,21 +415,19 @@ class SfrPipeline:
                 ogr_sf = ogr.Open(spatial_file)
                 shape_file_layer = ogr_sf.GetLayer(0)
 
-                print("CRS:", shape_file_layer.GetSpatialRef())
-
                 if first_layer:
                     first_layer = False
-                    layer_definition = shape_file_layer.GetLayerDefn()
-                    wkb_type = self.get_wkb_type(shape_file_layer)
-                    if wkb_type == ogr.wkbPolygon:
-                        wkb_type = ogr.wkbMultiPolygon
-                    db_layer = self.create_layer_from_definition(
-                        ogr_db,
-                        layer_definition,
-                        wkb_type
-                    )
+                    # layer_definition = shape_file_layer.GetLayerDefn()
+                    feature = shape_file_layer[0]
+                    geom = feature.GetGeometryRef()
+                    self.table_definition['feature_geometry'] = geom.GetGeometryType()
 
-                block = self.copy_features(shape_file_layer, db_layer, block)
+                    if self.table_definition['feature_geometry'] == ogr.wkbPolygon:
+                        self.table_definition['feature_geometry'] = ogr.wkbMultiPolygon
+
+                    db_layer = self.create_layer_from_table_definition(ogr_db)
+
+                block = self.copy_features_to_sfr(shape_file_layer, db_layer, block)
                 ogr_db.SyncToDisk()
                 ogr_sf.Destroy()
         except:
@@ -417,12 +456,32 @@ class SfrPipeline:
         Set spatial file type using helper function
         :return: None
         """
-        if self.spatial_file_type:
-            self.set_spatial_file_type(self.spatial_file_type)
-        else:
-            self.set_spatial_file_type(".geojson")
-            if not self.spatial_file_list:
-                self.set_spatial_file_type(".shp")
+        self.set_spatial_files(self.spatial_file_type)
+
+    def rename_geometry_column(self):
+        conn = None
+        try:
+            conn = psycopg2.connect("dbname='%s' host='%s' port='%s' user='%s' password='%s'" % (
+                os.getenv("DB_DATABASE", "bis"),
+                os.getenv("POSTGIS_SERVER", "localhost"),
+                os.getenv("POSTGIS_PORT", "5432"),
+                os.getenv("DB_USERNAME", "postgres"),
+                os.getenv("DB_PASSWORD", "admin")
+            ))
+
+            cursor = conn.cursor()
+
+            cursor.execute("alter table " + self.schema + "." + self.table +
+                           " rename column wkb_geometry to feature_geometry")
+
+            cursor.close()
+            conn.commit()
+        except Exception as e:
+            print("Exception occurred altering column name")
+            print(e)
+        finally:
+            if conn is not None:
+                conn.close()
 
     def add_index_job_to_queue(self,
                                schema,
@@ -466,6 +525,7 @@ class SfrPipeline:
             raise Exception("No spatial file found in extracted zip")
 
         self.create_table_from_spatial_file()
+        self.rename_geometry_column()
         self.clean_up_files()
 
     def run_full_pipeline(self):
