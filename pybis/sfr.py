@@ -462,11 +462,11 @@ class SfrPipeline:
         conn = None
         try:
             conn = psycopg2.connect("dbname='%s' host='%s' port='%s' user='%s' password='%s'" % (
-                os.getenv("DB_DATABASE", "bis"),
-                os.getenv("POSTGIS_SERVER", "localhost"),
-                os.getenv("POSTGIS_PORT", "5432"),
-                os.getenv("DB_USERNAME", "postgres"),
-                os.getenv("DB_PASSWORD", "admin")
+                self.database,
+                self.postgis_server,
+                self.postgis_port,
+                self.db_user,
+                self.db_password
             ))
 
             cursor = conn.cursor()
