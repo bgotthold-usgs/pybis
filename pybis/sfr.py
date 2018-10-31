@@ -28,23 +28,6 @@ API_TOKEN
 
 class SfrPipeline:
 
-    default_params = {
-        'item_id': None,
-        'table': None,
-        'srid': None,
-        'zipfile_title': None,
-        'schema': 'sfr',
-        'overwrite_existing_table': 'No',
-        'flip_coordinates': False,
-        'custom_encoding': None,
-        'spatial_file_type': None,
-        'fit_to_bounding_box': False,
-        'rounding_precision': None,
-        'clean_up_geom': False,
-        'spatial_file_list': [],
-        'json_schema': None
-    }
-
     table_definition = {
         'feature_id': ogr.OFTString,
         'feature_name': ogr.OFTString,
@@ -70,9 +53,25 @@ class SfrPipeline:
         :param rounding_precision: Round geom points to this level of precision when fixing
         :param clean_up_geom: Send the geoms through the rigorous cleanup process
         """
+        default_params = {
+            'item_id': None,
+            'table': None,
+            'srid': None,
+            'zipfile_title': None,
+            'schema': 'sfr',
+            'overwrite_existing_table': 'No',
+            'flip_coordinates': False,
+            'custom_encoding': None,
+            'spatial_file_type': None,
+            'fit_to_bounding_box': False,
+            'rounding_precision': None,
+            'clean_up_geom': False,
+            'spatial_file_list': [],
+            'json_schema': None
+        }
         self.description = "Set of functions for adding data to the SFR"
-        for key in self.default_params:
-            setattr(self, key, self.default_params[key])
+        for key in default_params:
+            setattr(self, key, default_params[key])
         for dictionary in initial_data:
             for key in dictionary:
                 setattr(self, key, dictionary[key])
