@@ -40,5 +40,4 @@ class Db:
     def connect_mongodb(db_name):
         mongo_uri = "mongodb://" + os.environ["MONGODB_USERNAME"] + ":" + os.environ["MONGODB_PASSWORD"] + "@" + os.environ["MONGODB_SERVER"] + "/" + os.environ["MONGODB_DATABASE"]
         client = MongoClient(mongo_uri)
-        client_db = client.get_database(os.environ["MONGODB_DATABASE"])
-        return client_db[db_name]
+        return client.get_database(os.environ["MONGODB_DATABASE"])
