@@ -1,9 +1,8 @@
-class Db:
-
 import os
 from pymongo import MongoClient
 
-"""Tools to connect to BIS databases.
+"""
+Tools to connect to BIS databases.
 
 This class contains tools to connect to BIS databases.
 
@@ -15,6 +14,8 @@ MONGODB_USERNAME
 MONGODB_SERVER
 MONGODB_PASSWORD
 """
+
+class Db:
 
     def __init__(self):
         self.description = "Set of functions for connecting to database infrastructure in various environments"
