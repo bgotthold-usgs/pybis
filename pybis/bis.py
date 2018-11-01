@@ -1,12 +1,13 @@
+import requests
+import re
+from ftfy import fix_text
+
 class Bis:
     def __init__(self):
         self.description = "Set of functions for general use across the Biogeographic Information System"
 
 
     def clean_scientific_name(scientificname):
-        import re
-        from ftfy import fix_text
-
         nameString = scientificname
 
         # Fix encoding translation issues
@@ -55,8 +56,6 @@ class Bis:
     def string_cleaning(text):
         if text is None:
             return None
-
-        import re
 
         # Specify replacements
         replacements = {}
