@@ -25,7 +25,7 @@ class Db:
             env_vars_set = []
             with open(config_file) as f:
                 for line in f:
-                    if 'export' not in line:
+                    if '=' not in line:
                         continue
                     if line.startswith('#'):
                         continue
