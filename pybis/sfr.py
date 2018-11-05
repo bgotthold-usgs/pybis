@@ -7,6 +7,19 @@ from osgeo import ogr, osr
 import shutil
 import json
 import psycopg2
+import subprocess
+
+# Relative path to precompiled libraries/binaries
+libdir = os.path.join(os.getcwd(), 'local', 'lib')
+bindir = os.path.join(os.getcwd(), 'local', 'bin')
+
+print("\n\n\n\nWhat: %s: " % libdir)
+
+command = 'LD_LIBRARY_PATH={} PATH=$PATH:{} ./raster_diff {} {}'.format(libdir, bindir)
+
+output = subprocess.check_output(command, shell=True)
+print("\n\n\n\n\nWOAH\n\n\n", flush=True)
+print(output, flush=True)
 
 """SFR pipeline tools.
 
