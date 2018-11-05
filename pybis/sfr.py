@@ -1,4 +1,7 @@
 import os
+
+print("WHAT:", os.environ["PATH"])
+print("WHAT2:", os.environ["LD_LIBRARY_PATH"])
 import requests
 import math
 import zipfile
