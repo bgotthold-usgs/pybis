@@ -1,13 +1,5 @@
-import requests
-import math
-import zipfile
-import os
-import sciencebasepy as pysb
-from osgeo import ogr, osr
-import shutil
-import json
-import psycopg2
 import subprocess
+import os
 
 # Relative path to precompiled libraries/binaries
 libdir = os.path.join(os.getcwd(), 'local', 'lib')
@@ -20,6 +12,15 @@ command = 'LD_LIBRARY_PATH={} PATH=$PATH:{} ./raster_diff {} {}'.format(libdir, 
 output = subprocess.check_output(command, shell=True)
 print("\n\n\n\n\nWOAH\n\n\n", flush=True)
 print(output, flush=True)
+
+import requests
+import math
+import zipfile
+import sciencebasepy as pysb
+from osgeo import ogr, osr
+import shutil
+import json
+import psycopg2
 
 """SFR pipeline tools.
 
