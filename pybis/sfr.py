@@ -164,10 +164,10 @@ class SfrPipeline:
             raise Exception("No URI was found for zipfile download")
 
     def parse_json_schema(self):
-        print("parse json schema" + self.json_schema, flush=True)
+        print("parse json schema" + str(self.json_schema), flush=True)
 
         for k in self.json_schema["@context"]:
-            print(k, flush=True)
+            print(str(k), flush=True)
 
             if k[0] != "@":
                 field_path = self.json_schema["@context"][k].split("/")
@@ -186,6 +186,7 @@ class SfrPipeline:
         :return: None
         """
         for file in os.listdir(self.directory):
+            print(str(file.lower()),flush=True)
             if file.endswith(spatial_file_type):
                 self.spatial_file_list.append(os.path.join(self.directory, file))
             elif file.lower().endswith("schema.json"):
@@ -354,7 +355,7 @@ class SfrPipeline:
             geom = feature.GetGeometryRef()
             out_feature = ogr.Feature(out_layer_defn)
 
-            print("dynamic_fields"+ self.dynamic_fields, flush=True)
+            print("dynamic_fields"+ str(self.dynamic_fields), flush=True)
             source_id = feature.GetField(self.dynamic_fields['feature_id_sourceIdentifier'])
             out_feature.SetField('feature_id', self.static_fields['feature_id_nameSpaceId'] + ":" + source_id)
             out_feature.SetField('feature_class', self.static_fields['feature_class'])
