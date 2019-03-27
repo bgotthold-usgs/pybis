@@ -358,8 +358,8 @@ class SfrPipeline:
 
             print("json_schema " + str(self.json_schema), flush=True)
             source_id = feature.GetField(self.json_schema['feature_id_sourceIdentifier'])
-            out_feature.SetField('feature_id', self.static_fields['feature_id_nameSpaceId'] + ":" + source_id)
-            out_feature.SetField('feature_class', self.static_fields['feature_class'])
+            out_feature.SetField('feature_id', self.json_schema['feature_id_nameSpaceId'] + ":" + source_id)
+            out_feature.SetField('feature_class', self.json_schema['feature_class'])
             out_feature.SetField('feature_name', feature.GetField(self.json_schema['feature_name']))
             out_feature.SetField('feature_description', feature.GetField(self.json_schema['feature_description']))
 
