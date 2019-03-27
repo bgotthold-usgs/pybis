@@ -164,9 +164,11 @@ class SfrPipeline:
             raise Exception("No URI was found for zipfile download")
 
     def parse_json_schema(self):
-        print("parse json schema")
+        print("parse json schema",self.json_schema)
 
         for k in self.json_schema["@context"]:
+            print(k)
+
             if k[0] != "@":
                 field_path = self.json_schema["@context"][k].split("/")
 
