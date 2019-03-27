@@ -355,7 +355,7 @@ class SfrPipeline:
             geom = feature.GetGeometryRef()
             out_feature = ogr.Feature(out_layer_defn)
 
-            print("dynamic_fields"+ str(self.dynamic_fields), flush=True)
+            print("dynamic_fields"+ str(self.json_schema), flush=True)
             source_id = feature.GetField(self.dynamic_fields['feature_id_sourceIdentifier'])
             out_feature.SetField('feature_id', self.static_fields['feature_id_nameSpaceId'] + ":" + source_id)
             out_feature.SetField('feature_class', self.static_fields['feature_class'])
