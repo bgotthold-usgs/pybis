@@ -74,6 +74,7 @@ class SfrPipeline:
             setattr(self, key, default_params[key])
         for dictionary in initial_data:
             for key in dictionary:
+                print(str(key) + " " + str(dictionary[key]), flush=True)
                 setattr(self, key, dictionary[key])
         for key in kwargs:
             setattr(self, key, kwargs[key])
