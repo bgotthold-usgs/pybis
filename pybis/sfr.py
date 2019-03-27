@@ -356,12 +356,12 @@ class SfrPipeline:
             geom = feature.GetGeometryRef()
             out_feature = ogr.Feature(out_layer_defn)
 
-            print("dynamic_fields"+ str(self.json_schema), flush=True)
-            source_id = feature.GetField(self.dynamic_fields['feature_id_sourceIdentifier'])
+            print("json_schema " + str(self.json_schema), flush=True)
+            source_id = feature.GetField(self.json_schema['feature_id_sourceIdentifier'])
             out_feature.SetField('feature_id', self.static_fields['feature_id_nameSpaceId'] + ":" + source_id)
             out_feature.SetField('feature_class', self.static_fields['feature_class'])
-            out_feature.SetField('feature_name', feature.GetField(self.dynamic_fields['feature_name']))
-            out_feature.SetField('feature_description', feature.GetField(self.dynamic_fields['feature_description']))
+            out_feature.SetField('feature_name', feature.GetField(self.json_schema['feature_name']))
+            out_feature.SetField('feature_description', feature.GetField(self.json_schema['feature_description']))
 
             # This check is in there mainly for a dataset we dealt with early on (the drd_dams dataset I think).
             # The lat/lngs were out of order in those points
